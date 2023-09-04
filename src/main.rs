@@ -7,8 +7,16 @@ fn read_something(reader: &mut BufReader<&TcpStream>) -> Result<String, std::io:
 }
 
 fn write_something(writer: &mut BufWriter<&TcpStream>, message: &str) -> Result<(), std::io::Error> {
-    let mut msg = String::from(message);
-    writer.write(message.as_bytes())?;
+    let msg = String::from(message);
+    println!("Sending message: {}", msg);
+    writer.write(msg.as_bytes())?;
+    writer.flush()?;
+    Ok(())
+}
+
+fn write_u64(writer: &mut BufWriter<&TcpStream>, message: u64) -> Result<(), std::io::Error> {
+    println!("Sending message: {}", message);
+    writer.write(message.to_string().as_bytes())?;
     writer.flush()?;
     Ok(())
 }
@@ -28,10 +36,10 @@ fn main() {
                 println!("Connected to the server!");
                 let mut reader = BufReader::new(&stream);
                 let mut writer = BufWriter::new(&stream);
-
+                
                 let str = read_something(&mut reader).unwrap();
                 println!("{}", str);
-                //write_something(&mut writer, "Hello from the client!").unwrap();
+                write_u64(&mut writer, 0xFFFC24).unwrap();
             },
             Err(e) => println!("Failed to connect: {}", e),
         }
