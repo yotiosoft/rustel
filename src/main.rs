@@ -12,25 +12,46 @@ enum IPv {
     IPv6,
 }
 
-fn telnet_read_utf8(stream: &TcpStream) -> Result<String, std::io::Error> {
+fn telnet_read_utf8(stream: &TcpStream) -> Result<Option<String>, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
     let mut buffer = String::new();
     buf_reader.read_to_string(&mut buffer)?;
     //println!("Received message: {:?} {}", buffer, text);
-    Ok(buffer)
+    if buffer.len() == 0 {
+        return Ok(None);
+    }
+    if buffer.contains("\0") {
+        let index = buffer.find("\0").unwrap();
+        buffer.truncate(index);
+    }
+    // is buffer contains EOF?
+    if buffer.contains("\u{1a}") {
+        let index = buffer.find("\u{1a}").unwrap();
+        buffer.truncate(index);
+    }
+    Ok(Some(buffer))
 }
 
-fn telnet_read_sjis(stream: &TcpStream) -> Result<String, std::io::Error> {
+fn telnet_read_sjis(stream: &TcpStream) -> Result<Option<String>, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
     let mut buffer: [u8; 4] = [0; 4];
     buf_reader.read(&mut buffer)?;
+    if buffer[0] == 0 {
+        return Ok(None);
+    }
     let (cow, _, _) = encoding_rs::SHIFT_JIS.decode(&buffer);
     let text = cow.into_owned();
     //println!("Received message: {:?} {}", buffer, text);
-    Ok(text)
+    // is buffer contains EOF?
+    let eof = [0x1a];
+    if buffer.contains(&eof[0]) {
+        let index = buffer.iter().position(|&x| x == eof[0]).unwrap();
+        buffer.truncate(index);
+    }
+    Ok(Some(text))
 }
 
-fn telnet_read(stream: &TcpStream, encode: &Encode) -> Result<String, std::io::Error> {
+fn telnet_read(stream: &TcpStream, encode: &Encode) -> Result<Option<String>, std::io::Error> {
     match encode {
         Encode::UTF8 => telnet_read_utf8(stream),
         Encode::SHIFT_JIS => telnet_read_sjis(stream),
@@ -59,9 +80,14 @@ fn main() {
                 println!("Connected to the server!");
                 loop {
                     let str = telnet_read(&stream, &encode).unwrap();
-                    print!("{}", str);
-                    std::io::stdout().flush().unwrap();
-                    if str == "\0" {
+                    if let Some(str) = str {
+                        print!("{}", str);
+                        std::io::stdout().flush().unwrap();
+                        if str == "\0" {
+                            break;
+                        }
+                    }
+                    else {
                         break;
                     }
                 }
