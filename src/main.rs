@@ -3,12 +3,11 @@ use encoding_rs;
 
 fn telnet_read(stream: &TcpStream) -> Result<String, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
-    let mut buffer: [u8; 2] = [0; 2];
+    let mut buffer: [u8; 4] = [0; 4];
     buf_reader.read(&mut buffer)?;
-    //println!("Received message: {:?}", buffer);
     let (cow, _, _) = encoding_rs::SHIFT_JIS.decode(&buffer);
     let text = cow.into_owned();
-    std::io::stdout().flush()?;
+    //println!("Received message: {:?} {}", buffer, text);
     Ok(text)
 }
 
