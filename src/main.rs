@@ -1,7 +1,26 @@
-use std::{net::{ToSocketAddrs, TcpStream}, io::BufReader, io::Write, io::{BufWriter, Read}};
+use std::net::{ToSocketAddrs, TcpStream};
+use std::io::{BufReader, Write, Read};
 use encoding_rs;
 
-fn telnet_read(stream: &TcpStream) -> Result<String, std::io::Error> {
+enum Encode {
+    UTF8,
+    SHIFT_JIS,
+}
+
+enum IPv {
+    IPv4,
+    IPv6,
+}
+
+fn telnet_read_utf8(stream: &TcpStream) -> Result<String, std::io::Error> {
+    let mut buf_reader = BufReader::new(stream);
+    let mut buffer = String::new();
+    buf_reader.read_to_string(&mut buffer)?;
+    //println!("Received message: {:?} {}", buffer, text);
+    Ok(buffer)
+}
+
+fn telnet_read_sjis(stream: &TcpStream) -> Result<String, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
     let mut buffer: [u8; 4] = [0; 4];
     buf_reader.read(&mut buffer)?;
@@ -11,22 +30,35 @@ fn telnet_read(stream: &TcpStream) -> Result<String, std::io::Error> {
     Ok(text)
 }
 
+fn telnet_read(stream: &TcpStream, encode: &Encode) -> Result<String, std::io::Error> {
+    match encode {
+        Encode::UTF8 => telnet_read_utf8(stream),
+        Encode::SHIFT_JIS => telnet_read_sjis(stream),
+    }
+}
+
 fn main() {
     let host = "koukoku.shadan.open.ad.jp";
     //let host = "india.colorado.edu";
     let port = 23;
+    let encode = Encode::SHIFT_JIS;
+    let ipv = IPv::IPv4;
 
     let host_and_port = format!("{}:{}", host, port);
     let mut addresses = host_and_port.to_socket_addrs().unwrap();
 
-    if let Some(address) = addresses.find(|x| x.is_ipv4()) {
+    let address = match ipv {
+        IPv::IPv4 => addresses.find(|x| x.is_ipv4()),
+        IPv::IPv6 => addresses.find(|x| x.is_ipv6()),
+    };
+    if let Some(address) = address {
         println!("Found an IPv4 address: {}", address);
 
         match TcpStream::connect(address) {
             Ok(stream) => {
                 println!("Connected to the server!");
                 loop {
-                    let str = telnet_read(&stream).unwrap();
+                    let str = telnet_read(&stream, &encode).unwrap();
                     print!("{}", str);
                     std::io::stdout().flush().unwrap();
                     if str == "\0" {
@@ -39,21 +71,4 @@ fn main() {
     } else {
         println!("No IPv4 address found");
     }
-}
-
-
-
-fn write_something(writer: &mut BufWriter<&TcpStream>, message: &str) -> Result<(), std::io::Error> {
-    let msg = String::from(message);
-    println!("Sending message: {}", msg);
-    writer.write(msg.as_bytes())?;
-    writer.flush()?;
-    Ok(())
-}
-
-fn write_u64(writer: &mut BufWriter<&TcpStream>, message: u64) -> Result<(), std::io::Error> {
-    println!("Sending message: {}", message);
-    writer.write(message.to_string().as_bytes())?;
-    writer.flush()?;
-    Ok(())
 }
