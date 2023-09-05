@@ -1,12 +1,11 @@
-use std::{net::{ToSocketAddrs, TcpStream}, io::BufRead, io::BufReader, io::Write, io::BufWriter};
+use std::{net::{ToSocketAddrs, TcpStream}, io::BufRead, io::BufReader, io::Write, io::{BufWriter, Read}};
 
-fn read_something(reader: &mut BufReader<&TcpStream>) -> Result<Vec<u8>, std::io::Error> {
-    let mut buffer = Vec::new();
-    reader.read_until(b'\n', &mut buffer)?;
-    for line in reader.lines() {
-        println!("RECV: {:?}", line?);
-    }
-    Ok(buffer)
+fn read_something(mut stream: &TcpStream) -> Result<(), std::io::Error> {
+    let mut buf_reader = BufReader::new(&mut stream);
+    let mut buffer: [u8; 1024] = [0; 1024];
+    buf_reader.read(&mut buffer)?;
+    println!("Received message: {:?}", buffer);
+    Ok(())
 }
 
 fn write_something(writer: &mut BufWriter<&TcpStream>, message: &str) -> Result<(), std::io::Error> {
@@ -38,11 +37,8 @@ fn main() {
         match TcpStream::connect(address) {
             Ok(stream) => {
                 println!("Connected to the server!");
-                let mut reader = BufReader::new(&stream);
-                let mut writer = BufWriter::new(&stream);
-                
-                let str = read_something(&mut reader).unwrap();
-                write_u64(&mut writer, 0xFFFC24).unwrap();
+                let str = read_something(&stream).unwrap();
+                //write_u64(&mut writer, 0xFFFC24).unwrap();
             },
             Err(e) => println!("Failed to connect: {}", e),
         }
