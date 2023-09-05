@@ -2,6 +2,8 @@ use std::net::{ToSocketAddrs, TcpStream};
 use std::io::{BufReader, Write, Read};
 use encoding_rs;
 
+const TCP_LEN_MAX: usize = 65536;
+
 enum Encode {
     UTF8,
     SHIFT_JIS,
@@ -20,21 +22,12 @@ fn telnet_read_utf8(stream: &TcpStream) -> Result<Option<String>, std::io::Error
     if buffer.len() == 0 {
         return Ok(None);
     }
-    if buffer.contains("\0") {
-        let index = buffer.find("\0").unwrap();
-        buffer.truncate(index);
-    }
-    // is buffer contains EOF?
-    if buffer.contains("\u{1a}") {
-        let index = buffer.find("\u{1a}").unwrap();
-        buffer.truncate(index);
-    }
     Ok(Some(buffer))
 }
 
 fn telnet_read_sjis(stream: &TcpStream) -> Result<Option<String>, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
-    let mut buffer: [u8; 4] = [0; 4];
+    let mut buffer: [u8; TCP_LEN_MAX] = [0; TCP_LEN_MAX];
     buf_reader.read(&mut buffer)?;
     if buffer[0] == 0 {
         return Ok(None);
@@ -42,12 +35,6 @@ fn telnet_read_sjis(stream: &TcpStream) -> Result<Option<String>, std::io::Error
     let (cow, _, _) = encoding_rs::SHIFT_JIS.decode(&buffer);
     let text = cow.into_owned();
     //println!("Received message: {:?} {}", buffer, text);
-    // is buffer contains EOF?
-    let eof = [0x1a];
-    if buffer.contains(&eof[0]) {
-        let index = buffer.iter().position(|&x| x == eof[0]).unwrap();
-        buffer.truncate(index);
-    }
     Ok(Some(text))
 }
 
@@ -84,6 +71,10 @@ fn main() {
                         print!("{}", str);
                         std::io::stdout().flush().unwrap();
                         if str == "\0" {
+                            break;
+                        }
+                        // is buffer contains EOF?
+                        if str.contains("\u{1a}") {
                             break;
                         }
                     }
