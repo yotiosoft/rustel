@@ -3,6 +3,9 @@ use std::{net::{ToSocketAddrs, TcpStream}, io::BufRead, io::BufReader, io::Write
 fn read_something(reader: &mut BufReader<&TcpStream>) -> Result<String, std::io::Error> {
     let mut buffer = String::new();
     reader.read_line(&mut buffer)?;
+    for line in reader.lines() {
+        println!("RECV: {:?}", line);
+    }
     Ok(buffer)
 }
 
@@ -22,8 +25,9 @@ fn write_u64(writer: &mut BufWriter<&TcpStream>, message: u64) -> Result<(), std
 }
 
 fn main() {
-    let host = "koukoku.shadan.open.ad.jp";
-    let port = 23;
+    //let host = "koukoku.shadan.open.ad.jp";
+    let host = "india.colorado.edu";
+    let port = 13;
 
     let host_and_port = format!("{}:{}", host, port);
     let mut addresses = host_and_port.to_socket_addrs().unwrap();
