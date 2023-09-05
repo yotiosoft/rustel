@@ -1,12 +1,14 @@
-use std::{net::{ToSocketAddrs, TcpStream}, io::BufRead, io::BufReader, io::Write, io::BufWriter};
+use std::{net::{ToSocketAddrs, TcpStream}, io::BufRead, io::BufReader, io::Write, io::{BufWriter, Read}};
 
-fn read_something(reader: &mut BufReader<&TcpStream>) -> Result<String, std::io::Error> {
-    let mut buffer = String::new();
-    reader.read_line(&mut buffer)?;
-    for line in reader.lines() {
-        println!("RECV: {:?}", line);
-    }
-    Ok(buffer)
+fn read_something(mut stream: TcpStream) -> Result<(), std::io::Error> {
+    let buf_reader = BufReader::new(&mut stream);
+    let http_request: Vec<_> = buf_reader
+        .lines()
+        .map(|result| result.unwrap())
+        .take_while(|line| !line.is_empty())
+        .collect();
+    println!("Received message: {:?}", http_request);
+    Ok(())
 }
 
 fn write_something(writer: &mut BufWriter<&TcpStream>, message: &str) -> Result<(), std::io::Error> {
@@ -25,9 +27,9 @@ fn write_u64(writer: &mut BufWriter<&TcpStream>, message: u64) -> Result<(), std
 }
 
 fn main() {
-    //let host = "koukoku.shadan.open.ad.jp";
-    let host = "india.colorado.edu";
-    let port = 13;
+    let host = "koukoku.shadan.open.ad.jp";
+    //let host = "india.colorado.edu";
+    let port = 23;
 
     let host_and_port = format!("{}:{}", host, port);
     let mut addresses = host_and_port.to_socket_addrs().unwrap();
@@ -38,12 +40,8 @@ fn main() {
         match TcpStream::connect(address) {
             Ok(stream) => {
                 println!("Connected to the server!");
-                let mut reader = BufReader::new(&stream);
-                let mut writer = BufWriter::new(&stream);
-                
-                let str = read_something(&mut reader).unwrap();
-                println!("{}", str);
-                write_u64(&mut writer, 0xFFFC24).unwrap();
+                let str = read_something(stream).unwrap();
+                //write_u64(&mut writer, 0xFFFC24).unwrap();
             },
             Err(e) => println!("Failed to connect: {}", e),
         }
