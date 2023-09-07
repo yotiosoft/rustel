@@ -41,19 +41,29 @@ async fn telnet_read_sjis(stream: &mut ReadHalf<TcpStream>) -> Result<Option<Str
     Ok(Some(text))
 }
 
-async fn telnet_read(stream: &mut ReadHalf<TcpStream>, encode: &Encode) -> Result<Option<String>, std::io::Error> {
-    match encode {
-        Encode::UTF8 => {
-            loop {
-                telnet_read_utf8(stream).await?;
+async fn telnet_read(stream: &mut ReadHalf<TcpStream>, encode: &Encode) -> Result<(), std::io::Error> {
+    loop {
+        let str = match encode {
+            Encode::UTF8 => telnet_read_utf8(stream).await?,
+            Encode::SHIFT_JIS => telnet_read_sjis(stream).await?,
+        };
+
+        if let Some(str) = str {
+            print!("{}", str);
+            std::io::stdout().flush()?;
+            if str == "\0" {
+                break;
             }
-        },
-        Encode::SHIFT_JIS =>  {
-            loop {
-                telnet_read_sjis(stream).await?;
+            // is buffer contains EOF?
+            if str.contains("\u{1a}") {
+                break;
             }
         }
-    }
+        else {
+            break;
+        }
+    };
+    Ok(())
 }
 
 async fn telnet_write_utf8(stream: &mut WriteHalf<TcpStream>, str: &str) -> Result<(), std::io::Error> {
@@ -78,17 +88,19 @@ async fn telnet_write(stream: &mut WriteHalf<TcpStream>, encode: &Encode, str: &
     }
 }
 
-async fn telnet_input(stream: &mut WriteHalf<TcpStream>, encode: &Encode) -> Result<(), Box<dyn std::error::Error>> {
-    let mut input = String::new();
-    if let Ok(_) = std::io::stdin().read_line(&mut input) {
-        if input.len() == 0 {
-            return Ok(());
+async fn telnet_input(stream: &mut WriteHalf<TcpStream>, encode: &Encode) -> Result<(), std::io::Error> {
+    loop {
+        let mut input = String::new();
+        if let Ok(_) = std::io::stdin().read_line(&mut input) {
+            if input.len() == 0 {
+                break;
+            }
+            telnet_write(stream, encode, &input).await?;
         }
-        telnet_write(stream, encode, &input).await?;
-    }
-    else {
-        return Ok(());
-    }
+        else {
+            break;
+        }
+    };
     Ok(())
 }
 
@@ -114,27 +126,15 @@ async fn main() -> tokio::io::Result<()> {
             Ok(stream) => {
                 println!("Connected to the server!");
                 let (mut reader, mut writer) = tokio::io::split(stream);
-                loop {
-                    // read
-                    let str = telnet_read(&mut reader, &encode).await?;
-                    if let Some(str) = str {
-                        print!("{}", str);
-                        std::io::stdout().flush()?;
-                        if str == "\0" {
-                            break;
-                        }
-                        // is buffer contains EOF?
-                        if str.contains("\u{1a}") {
-                            break;
-                        }
-                    }
-                    else {
-                        break;
-                    }
 
-                    // write
-                    tokio::spawn(telnet_input(&mut writer, &encode));
-                }
+                // read
+                let reader = tokio::spawn(telnet_read(&mut reader, &encode));
+
+                // write
+                let writer = tokio::spawn(telnet_input(&mut writer, &encode));
+
+                reader.await?;
+                writer.abort();
             },
             Err(e) => println!("Failed to connect: {}", e),
         }
