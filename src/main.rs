@@ -32,6 +32,11 @@ async fn telnet_read_sjis(stream: &mut TcpStream) -> Result<Option<String>, std:
     println!("telnet_read_sjis");
     let mut buf_reader = BufReader::new(stream);
     let mut buffer: [u8; TCP_LEN_MAX] = [0; TCP_LEN_MAX];
+    let mut buf_str = String::new();
+    buf_reader.read_to_string(&mut buf_str).await?;
+    print!("buf_str: {}", buf_str.len());
+    Ok(Some(buf_str))
+    /*
     buf_reader.read(&mut buffer).await?;
     if buffer[0] == 0 {
         return Ok(None);
@@ -40,6 +45,7 @@ async fn telnet_read_sjis(stream: &mut TcpStream) -> Result<Option<String>, std:
     let text = cow.into_owned();
     //println!("Received message: {:?} {}", buffer, text);
     Ok(Some(text))
+    */
 }
 
 async fn telnet_read(stream: &mut TcpStream, encode: &Encode) -> Result<Option<String>, std::io::Error> {
