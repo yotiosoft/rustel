@@ -1,7 +1,8 @@
-use std::io::{Write, BufWriter};
+use std::io::Write;
+use std::net::ToSocketAddrs;
 
-use tokio::net::{ToSocketAddrs, TcpStream};
-use tokio::io::{BufReader, AsyncWrite, AsyncRead, AsyncReadExt};
+use tokio::net::TcpStream;
+use tokio::io::{BufReader, AsyncWrite, AsyncRead, AsyncReadExt, AsyncWriteExt};
 use encoding_rs;
 
 const TCP_LEN_MAX: usize = 65536;
@@ -19,7 +20,7 @@ enum IPv {
 async fn telnet_read_utf8(stream: &mut TcpStream) -> Result<Option<String>, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
     let mut buffer = String::new();
-    buf_reader.read_to_string(&mut buffer);
+    buf_reader.read_to_string(&mut buffer).await;
     //println!("Received message: {:?} {}", buffer, text);
     if buffer.len() == 0 {
         return Ok(None);
@@ -28,9 +29,10 @@ async fn telnet_read_utf8(stream: &mut TcpStream) -> Result<Option<String>, std:
 }
 
 async fn telnet_read_sjis(stream: &mut TcpStream) -> Result<Option<String>, std::io::Error> {
+    println!("telnet_read_sjis");
     let mut buf_reader = BufReader::new(stream);
     let mut buffer: [u8; TCP_LEN_MAX] = [0; TCP_LEN_MAX];
-    buf_reader.read(&mut buffer);
+    buf_reader.read(&mut buffer).await?;
     if buffer[0] == 0 {
         return Ok(None);
     }
@@ -48,34 +50,34 @@ async fn telnet_read(stream: &mut TcpStream, encode: &Encode) -> Result<Option<S
 }
 
 async fn telnet_write_utf8(stream: &mut TcpStream, str: &str) -> Result<(), std::io::Error> {
-    let mut buf_writer = BufWriter::new(stream);
-    buf_writer.write(str.as_bytes())?;
-    buf_writer.flush()?;
+    let mut buf_writer = stream;
+    buf_writer.try_write(str.as_bytes())?;
+    buf_writer.flush();
     Ok(())
 }
 
-async fn telnet_write_sjis(stream: &TcpStream, str: &str) -> Result<(), std::io::Error> {
+async fn telnet_write_sjis(stream: &mut TcpStream, str: &str) -> Result<(), std::io::Error> {
     let mut buf_writer = stream;
     let (cow, _, _) = encoding_rs::SHIFT_JIS.encode(str);
-    buf_writer.write(&cow)?;
-    buf_writer.flush()?;
+    buf_writer.try_write(&cow)?;
+    buf_writer.flush();
     Ok(())
 }
 
-fn telnet_write(stream: &TcpStream, encode: &Encode, str: &str) -> Result<(), std::io::Error> {
+async fn telnet_write(stream: &mut TcpStream, encode: &Encode, str: &str) -> Result<(), std::io::Error> {
     match encode {
-        Encode::UTF8 => telnet_write_utf8(stream, str),
-        Encode::SHIFT_JIS => telnet_write_sjis(stream, str),
+        Encode::UTF8 => telnet_write_utf8(stream, str).await,
+        Encode::SHIFT_JIS => telnet_write_sjis(stream, str).await,
     }
 }
 
-async fn telnet_input(stream: &TcpStream, encode: &Encode) -> Result<(), Box<dyn std::error::Error>> {
+async fn telnet_input(stream: &mut TcpStream, encode: &Encode) -> Result<(), Box<dyn std::error::Error>> {
     let mut input = String::new();
     if let Ok(_) = std::io::stdin().read_line(&mut input) {
         if input.len() == 0 {
             return Ok(());
         }
-        telnet_write(stream, encode, &input)?;
+        telnet_write(stream, encode, &input).await?;
     }
     else {
         return Ok(());
@@ -102,11 +104,11 @@ async fn main() {
         println!("Found an IPv4 address: {}", address);
 
         match TcpStream::connect(address).await {
-            Ok(stream) => {
+            Ok(mut stream) => {
                 println!("Connected to the server!");
                 loop {
                     // read
-                    let str = telnet_read(&stream, &encode).unwrap();
+                    let str = telnet_read(&mut stream, &encode).await.unwrap();
                     if let Some(str) = str {
                         print!("{}", str);
                         std::io::stdout().flush().unwrap();
@@ -123,7 +125,7 @@ async fn main() {
                     }
 
                     // write
-                    telnet_input(&stream, &encode).await.unwrap()
+                    telnet_input(&mut stream, &encode).await.unwrap()
                 }
             },
             Err(e) => println!("Failed to connect: {}", e),
