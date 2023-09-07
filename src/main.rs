@@ -8,6 +8,7 @@ use encoding_rs;
 
 const TCP_LEN_MAX: usize = 65536;
 
+#[derive(Clone)]
 enum Encode {
     UTF8,
     SHIFT_JIS,
@@ -41,11 +42,11 @@ async fn telnet_read_sjis(stream: &mut ReadHalf<TcpStream>) -> Result<Option<Str
     Ok(Some(text))
 }
 
-async fn telnet_read(stream: &mut ReadHalf<TcpStream>, encode: &Encode) -> Result<(), std::io::Error> {
+async fn telnet_read(mut stream: ReadHalf<TcpStream>, encode: Encode) -> Result<(), std::io::Error> {
     loop {
         let str = match encode {
-            Encode::UTF8 => telnet_read_utf8(stream).await?,
-            Encode::SHIFT_JIS => telnet_read_sjis(stream).await?,
+            Encode::UTF8 => telnet_read_utf8(&mut stream).await?,
+            Encode::SHIFT_JIS => telnet_read_sjis(&mut stream).await?,
         };
 
         if let Some(str) = str {
@@ -88,14 +89,14 @@ async fn telnet_write(stream: &mut WriteHalf<TcpStream>, encode: &Encode, str: &
     }
 }
 
-async fn telnet_input(stream: &mut WriteHalf<TcpStream>, encode: &Encode) -> Result<(), std::io::Error> {
+async fn telnet_input(mut stream: WriteHalf<TcpStream>, encode: Encode) -> Result<(), std::io::Error> {
     loop {
         let mut input = String::new();
         if let Ok(_) = std::io::stdin().read_line(&mut input) {
             if input.len() == 0 {
                 break;
             }
-            telnet_write(stream, encode, &input).await?;
+            telnet_write(&mut stream, &encode, &input).await?;
         }
         else {
             break;
@@ -125,13 +126,13 @@ async fn main() -> tokio::io::Result<()> {
         match TcpStream::connect(address).await {
             Ok(stream) => {
                 println!("Connected to the server!");
-                let (mut reader, mut writer) = tokio::io::split(stream);
+                let (reader, writer) = tokio::io::split(stream);
 
                 // read
-                let reader = tokio::spawn(telnet_read(&mut reader, &encode));
+                let reader = tokio::spawn(telnet_read(reader, encode.clone()));
 
                 // write
-                let writer = tokio::spawn(telnet_input(&mut writer, &encode));
+                let writer = tokio::spawn(telnet_input(writer, encode.clone()));
 
                 reader.await?;
                 writer.abort();
