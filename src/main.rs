@@ -45,6 +45,28 @@ fn telnet_read(stream: &TcpStream, encode: &Encode) -> Result<Option<String>, st
     }
 }
 
+fn telnet_write_utf8(stream: &TcpStream, str: &str) -> Result<(), std::io::Error> {
+    let mut buf_writer = stream;
+    buf_writer.write(str.as_bytes())?;
+    buf_writer.flush()?;
+    Ok(())
+}
+
+fn telnet_write_sjis(stream: &TcpStream, str: &str) -> Result<(), std::io::Error> {
+    let mut buf_writer = stream;
+    let (cow, _, _) = encoding_rs::SHIFT_JIS.encode(str);
+    buf_writer.write(&cow)?;
+    buf_writer.flush()?;
+    Ok(())
+}
+
+fn telnet_write(stream: &TcpStream, encode: &Encode, str: &str) -> Result<(), std::io::Error> {
+    match encode {
+        Encode::UTF8 => telnet_write_utf8(stream, str),
+        Encode::SHIFT_JIS => telnet_write_sjis(stream, str),
+    }
+}
+
 fn main() {
     let host = "koukoku.shadan.open.ad.jp";
     //let host = "india.colorado.edu";
@@ -66,6 +88,7 @@ fn main() {
             Ok(stream) => {
                 println!("Connected to the server!");
                 loop {
+                    // read
                     let str = telnet_read(&stream, &encode).unwrap();
                     if let Some(str) = str {
                         print!("{}", str);
@@ -77,6 +100,18 @@ fn main() {
                         if str.contains("\u{1a}") {
                             break;
                         }
+                    }
+                    else {
+                        break;
+                    }
+
+                    // write
+                    let mut input = String::new();
+                    if let Ok(_) = std::io::stdin().read_line(&mut input) {
+                        if input.len() == 0 {
+                            break;
+                        }
+                        telnet_write(&stream, &encode, &input).unwrap();
                     }
                     else {
                         break;
