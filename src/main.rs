@@ -69,16 +69,17 @@ async fn telnet_read(mut stream: ReadHalf<TcpStream>, encode: Encode) -> Result<
 
 async fn telnet_write_utf8(stream: &mut WriteHalf<TcpStream>, str: &str) -> Result<(), std::io::Error> {
     let buf_writer = stream;
-    buf_writer.write(str.as_bytes());
-    buf_writer.flush();
+    buf_writer.write(str.as_bytes()).await?;
+    buf_writer.flush().await?;
     Ok(())
 }
 
 async fn telnet_write_sjis(stream: &mut WriteHalf<TcpStream>, str: &str) -> Result<(), std::io::Error> {
+    println!("send: {}", str);
     let buf_writer = stream;
     let (cow, _, _) = encoding_rs::SHIFT_JIS.encode(str);
-    buf_writer.write(&cow);
-    buf_writer.flush();
+    buf_writer.write(&cow).await?;
+    buf_writer.flush().await?;
     Ok(())
 }
 
