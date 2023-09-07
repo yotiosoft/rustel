@@ -2,7 +2,7 @@ use std::io::Write;
 use std::net::ToSocketAddrs;
 
 use tokio::net::TcpStream;
-use tokio::io::{BufReader, AsyncWrite, AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{BufReader, AsyncWrite, AsyncRead, AsyncReadExt, AsyncWriteExt, AsyncBufReadExt};
 use encoding_rs;
 
 const TCP_LEN_MAX: usize = 65536;
@@ -20,8 +20,8 @@ enum IPv {
 async fn telnet_read_utf8(stream: &mut TcpStream) -> Result<Option<String>, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
     let mut buffer = String::new();
-    buf_reader.read_to_string(&mut buffer).await;
-    //println!("Received message: {:?} {}", buffer, text);
+    buf_reader.read_to_string(&mut buffer).await?;
+    //println!("Received message: {}", buffer);
     if buffer.len() == 0 {
         return Ok(None);
     }
@@ -29,15 +29,8 @@ async fn telnet_read_utf8(stream: &mut TcpStream) -> Result<Option<String>, std:
 }
 
 async fn telnet_read_sjis(stream: &mut TcpStream) -> Result<Option<String>, std::io::Error> {
-    println!("telnet_read_sjis");
     let mut buf_reader = BufReader::new(stream);
-    let mut buffer: [u8; TCP_LEN_MAX] = [0; TCP_LEN_MAX];
-    let mut buf_str = String::new();
-    buf_reader.read_to_string(&mut buf_str).await?;
-    print!("buf_str: {}", buf_str.len());
-    Ok(Some(buf_str))
-    /*
-    buf_reader.read(&mut buffer).await?;
+    let buffer = buf_reader.fill_buf().await?;
     if buffer[0] == 0 {
         return Ok(None);
     }
@@ -45,7 +38,6 @@ async fn telnet_read_sjis(stream: &mut TcpStream) -> Result<Option<String>, std:
     let text = cow.into_owned();
     //println!("Received message: {:?} {}", buffer, text);
     Ok(Some(text))
-    */
 }
 
 async fn telnet_read(stream: &mut TcpStream, encode: &Encode) -> Result<Option<String>, std::io::Error> {
@@ -56,14 +48,14 @@ async fn telnet_read(stream: &mut TcpStream, encode: &Encode) -> Result<Option<S
 }
 
 async fn telnet_write_utf8(stream: &mut TcpStream, str: &str) -> Result<(), std::io::Error> {
-    let mut buf_writer = stream;
+    let buf_writer = stream;
     buf_writer.try_write(str.as_bytes())?;
     buf_writer.flush();
     Ok(())
 }
 
 async fn telnet_write_sjis(stream: &mut TcpStream, str: &str) -> Result<(), std::io::Error> {
-    let mut buf_writer = stream;
+    let buf_writer = stream;
     let (cow, _, _) = encoding_rs::SHIFT_JIS.encode(str);
     buf_writer.try_write(&cow)?;
     buf_writer.flush();
@@ -131,7 +123,7 @@ async fn main() {
                     }
 
                     // write
-                    telnet_input(&mut stream, &encode).await.unwrap()
+                    //telnet_input(&mut stream, &encode).await.unwrap()
                 }
             },
             Err(e) => println!("Failed to connect: {}", e),
