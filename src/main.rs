@@ -16,7 +16,9 @@ async fn telnet_read_utf8(stream: &mut ReadHalf<TcpStream>) -> Result<Option<Str
     if buffer.len() == 0 {
         return Ok(None);
     }
-    Ok(Some(buffer.iter().map(|&x| x as char).collect::<String>()))
+    let (cow, _, _) = encoding_rs::UTF_8.decode(&buffer);
+    let text = cow.into_owned();
+    Ok(Some(text))
 }
 
 async fn telnet_read_sjis(stream: &mut ReadHalf<TcpStream>) -> Result<Option<String>, std::io::Error> {
