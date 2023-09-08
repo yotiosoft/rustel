@@ -12,7 +12,7 @@ pub enum IPv {
 }
 
 pub struct ArgStruct {
-    pub address: String,
+    pub url: String,
     pub port: u16,
     pub encode: Encode,
     pub ipv: IPv,
@@ -21,9 +21,9 @@ pub struct ArgStruct {
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    // destination address (required)
+    // destination URL (required)
     #[arg(short, long)]
-    address: String,
+    url: String,
 
     // destination port number (default: 23)
     #[arg(short, long, default_value = "23")]
@@ -55,7 +55,7 @@ pub fn parser() -> ArgStruct {
     };
 
     ArgStruct {
-        address: args.address,
+        url: args.url,
         port: args.port,
         encode: encode,
         ipv: ipv,

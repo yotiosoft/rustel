@@ -99,7 +99,7 @@ async fn telnet_input(mut stream: WriteHalf<TcpStream>, encode: Encode) -> Resul
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
     let args = args::parser();
-    let host = args.address;
+    let host = args.url;
     let port = args.port;
     let encode = args.encode;
     let ipv = args.ipv;
@@ -130,7 +130,7 @@ async fn main() -> tokio::io::Result<()> {
                 // write
                 let writer = tokio::spawn(telnet_input(writer, encode.clone()));
 
-                reader.await?;
+                let _ = reader.await?;
                 writer.abort();
             },
             Err(e) => println!("Failed to connect: {}", e),
