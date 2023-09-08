@@ -82,14 +82,15 @@ async fn telnet_write(stream: &mut WriteHalf<TcpStream>, encode: &Encode, str: &
 async fn telnet_input(mut stream: WriteHalf<TcpStream>, encode: Encode) -> Result<(), std::io::Error> {
     loop {
         let mut input = String::new();
-        if let Ok(_) = std::io::stdin().read_line(&mut input) {
-            telnet_write(&mut stream, &encode, &input).await?;
-        }
-        else {
-            break;
+        match std::io::stdin().read_line(&mut input) {
+            Ok(_) => {
+                telnet_write(&mut stream, &encode, &input).await?;
+            },
+            Err(e) => {
+                return Err(e);
+            }
         }
     };
-    Ok(())
 }
 
 #[tokio::main]
