@@ -110,7 +110,7 @@ async fn main() -> tokio::io::Result<()> {
     //let ipv = IPv::IPv4;
 
     let host_and_port = format!("{}:{}", host, port);
-    let mut addresses = host_and_port.to_socket_addrs().unwrap();
+    let mut addresses = host_and_port.to_socket_addrs()?;
 
     let address = match ipv {
         IPv::IPv4 => addresses.find(|x| x.is_ipv4()),
