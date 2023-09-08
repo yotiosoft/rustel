@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::net::ToSocketAddrs;
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt, AsyncBufReadExt, BufReader, ReadHalf, WriteHalf};
+use tokio::io::{AsyncWriteExt, AsyncBufReadExt, BufReader, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 
 use encoding_rs;
@@ -11,13 +11,12 @@ use args::{Encode, IPv};
 
 async fn telnet_read_utf8(stream: &mut ReadHalf<TcpStream>) -> Result<Option<String>, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
-    let mut buffer = String::new();
-    buf_reader.read_to_string(&mut buffer).await?;
+    let buffer = buf_reader.fill_buf().await?;
     //println!("Received message: {}", buffer);
     if buffer.len() == 0 {
         return Ok(None);
     }
-    Ok(Some(buffer))
+    Ok(Some(buffer.iter().map(|&x| x as char).collect::<String>()))
 }
 
 async fn telnet_read_sjis(stream: &mut ReadHalf<TcpStream>) -> Result<Option<String>, std::io::Error> {
