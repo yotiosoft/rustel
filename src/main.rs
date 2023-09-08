@@ -6,18 +6,8 @@ use tokio::net::TcpStream;
 
 use encoding_rs;
 
-const TCP_LEN_MAX: usize = 65536;
-
-#[derive(Clone)]
-enum Encode {
-    UTF8,
-    SHIFT_JIS,
-}
-
-enum IPv {
-    IPv4,
-    IPv6,
-}
+mod args;
+use args::{Encode, IPv};
 
 async fn telnet_read_utf8(stream: &mut ReadHalf<TcpStream>) -> Result<Option<String>, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
@@ -46,7 +36,7 @@ async fn telnet_read(mut stream: ReadHalf<TcpStream>, encode: Encode) -> Result<
     loop {
         let str = match encode {
             Encode::UTF8 => telnet_read_utf8(&mut stream).await?,
-            Encode::SHIFT_JIS => telnet_read_sjis(&mut stream).await?,
+            Encode::SHIFTJIS => telnet_read_sjis(&mut stream).await?,
         };
 
         if let Some(str) = str {
@@ -86,7 +76,7 @@ async fn telnet_write_sjis(stream: &mut WriteHalf<TcpStream>, str: &str) -> Resu
 async fn telnet_write(stream: &mut WriteHalf<TcpStream>, encode: &Encode, str: &str) -> Result<(), std::io::Error> {
     match encode {
         Encode::UTF8 => telnet_write_utf8(stream, str).await,
-        Encode::SHIFT_JIS => telnet_write_sjis(stream, str).await,
+        Encode::SHIFTJIS => telnet_write_sjis(stream, str).await,
     }
 }
 
@@ -108,11 +98,16 @@ async fn telnet_input(mut stream: WriteHalf<TcpStream>, encode: Encode) -> Resul
 
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
-    let host = "koukoku.shadan.open.ad.jp";
+    let args = args::parser();
+    let host = args.address;
+    let port = args.port;
+    let encode = args.encode;
+    let ipv = args.ipv;
+    //let host = "koukoku.shadan.open.ad.jp";
     //let host = "india.colorado.edu";
-    let port = 23;
-    let encode = Encode::SHIFT_JIS;
-    let ipv = IPv::IPv4;
+    //let port = 23;
+    //let encode = Encode::SHIFTJIS;
+    //let ipv = IPv::IPv4;
 
     let host_and_port = format!("{}:{}", host, port);
     let mut addresses = host_and_port.to_socket_addrs().unwrap();
