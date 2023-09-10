@@ -9,7 +9,7 @@ IPv4 および IPv6 に、文字コードは UTF-8 および Shift_JIS に対応
 
 ```bash
 $ git clone https://github.com/yotiosoft/rustel.git
-$ cargo install --path .
+$ cargo install --path ./rustel
 ```
 
 # 使用方法
