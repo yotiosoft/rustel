@@ -9,6 +9,7 @@ use encoding_rs;
 mod args;
 use args::{Encode, IPv};
 
+/// Recieve data from server and read it as UTF-8
 async fn telnet_read_utf8(stream: &mut ReadHalf<TcpStream>) -> Result<Option<String>, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
     let buffer = buf_reader.fill_buf().await?;
@@ -19,6 +20,7 @@ async fn telnet_read_utf8(stream: &mut ReadHalf<TcpStream>) -> Result<Option<Str
     Ok(Some(buffer.iter().map(|&x| x as char).collect::<String>()))
 }
 
+/// Recieve data from server and read it as Shift-JIS
 async fn telnet_read_sjis(stream: &mut ReadHalf<TcpStream>) -> Result<Option<String>, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
     let buffer = buf_reader.fill_buf().await?;
@@ -31,6 +33,7 @@ async fn telnet_read_sjis(stream: &mut ReadHalf<TcpStream>) -> Result<Option<Str
     Ok(Some(text))
 }
 
+/// Recieve data from server and print it
 async fn telnet_read(mut stream: ReadHalf<TcpStream>, encode: Encode) -> Result<(), std::io::Error> {
     loop {
         let str = match encode {
@@ -56,6 +59,7 @@ async fn telnet_read(mut stream: ReadHalf<TcpStream>, encode: Encode) -> Result<
     Ok(())
 }
 
+/// Get input from stdin and send it to server as UTF-8
 async fn telnet_write_utf8(stream: &mut WriteHalf<TcpStream>, str: &str) -> Result<(), std::io::Error> {
     let buf_writer = stream;
     buf_writer.write(str.as_bytes()).await?;
@@ -63,6 +67,7 @@ async fn telnet_write_utf8(stream: &mut WriteHalf<TcpStream>, str: &str) -> Resu
     Ok(())
 }
 
+/// Get input from stdin and send it to server as Shift-JIS
 async fn telnet_write_sjis(stream: &mut WriteHalf<TcpStream>, str: &str) -> Result<(), std::io::Error> {
     println!("send: {}", str);
     let buf_writer = stream;
@@ -72,19 +77,16 @@ async fn telnet_write_sjis(stream: &mut WriteHalf<TcpStream>, str: &str) -> Resu
     Ok(())
 }
 
-async fn telnet_write(stream: &mut WriteHalf<TcpStream>, encode: &Encode, str: &str) -> Result<(), std::io::Error> {
-    match encode {
-        Encode::UTF8 => telnet_write_utf8(stream, str).await,
-        Encode::SHIFTJIS => telnet_write_sjis(stream, str).await,
-    }
-}
-
-async fn telnet_input(mut stream: WriteHalf<TcpStream>, encode: Encode) -> Result<(), std::io::Error> {
+/// Get input from stdin and send it to server
+async fn telnet_write(mut stream: WriteHalf<TcpStream>, encode: Encode) -> Result<(), std::io::Error> {
     loop {
         let mut input = String::new();
         match std::io::stdin().read_line(&mut input) {
             Ok(_) => {
-                telnet_write(&mut stream, &encode, &input).await?;
+                match encode {
+                    Encode::UTF8 => telnet_write_utf8(&mut stream, &input).await,
+                    Encode::SHIFTJIS => telnet_write_sjis(&mut stream, &input).await,
+                }?;
             },
             Err(e) => {
                 return Err(e);
@@ -125,7 +127,7 @@ async fn main() -> tokio::io::Result<()> {
                 let reader = tokio::spawn(telnet_read(reader, encode.clone()));
 
                 // write
-                let writer = tokio::spawn(telnet_input(writer, encode.clone()));
+                let writer = tokio::spawn(telnet_write(writer, encode.clone()));
 
                 let _ = reader.await?;
                 writer.abort();
