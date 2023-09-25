@@ -1,5 +1,5 @@
 use std::net::ToSocketAddrs;
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream, TcpListener};
 use args::IPv;
 
 mod args;
@@ -42,6 +42,33 @@ async fn client(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
     }
 }
 
+async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Result<(), std::io::Error> {
+    let host_and_port = format!("{}:{}", host, port);
+    let mut addresses = host_and_port.to_socket_addrs()?;
+
+    let address = match ipv {
+        IPv::IPv4 => addresses.find(|x| x.is_ipv4()),
+        IPv::IPv6 => addresses.find(|x| x.is_ipv6()),
+    };
+
+    let listener = TcpListener::bind(address.unwrap()).await?;
+    loop {
+        let (mut stream, _) = listener.accept().await?;
+        let (reader, writer) = tokio::io::split(stream);
+
+        // read
+        let reader = tokio::spawn(client::telnet_recv(reader, encode.clone()));
+
+        // write
+        let writer = tokio::spawn(client::telnet_send(writer, encode.clone()));
+
+        let _ = reader.await?;
+        writer.abort();
+    }
+    
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
     let args = args::parser();
@@ -61,7 +88,7 @@ async fn main() -> tokio::io::Result<()> {
             client(host, port, encode, ipv).await?;
         },
         args::Mode::Server => {
-            println!("server");
+            server(host, port, encode, ipv).await?;
         },
     }
 
