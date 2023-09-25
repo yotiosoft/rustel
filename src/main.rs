@@ -1,9 +1,11 @@
 use std::net::ToSocketAddrs;
 use tokio::net::{TcpStream, TcpListener};
 use args::{IPv, Encode};
+use std::sync::Arc;
 
 mod args;
 mod client;
+mod server;
 
 async fn client(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Result<(), std::io::Error> {
     let host_and_port = format!("{}:{}", host, port);
@@ -51,10 +53,21 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
         IPv::IPv6 => addresses.find(|x| x.is_ipv6()),
     };
 
+    // write
+    let mut send_buffer = Arc::new(String::new());
+    let encode_clone = encode.clone();
+    let v = Arc::clone(&send_buffer);
+    tokio::spawn(async move {
+        loop {
+            server::telnet_send(&v, encode_clone.clone()).await;
+        }
+    });
+
     let listener = TcpListener::bind(address.unwrap()).await?;
     loop {
         let (mut stream, _) = listener.accept().await?;
         let encode_clone = encode.clone();
+        let v2 = Arc::clone(&send_buffer);
         tokio::spawn(async move {
             let (reader, writer) = tokio::io::split(stream);
 
@@ -62,7 +75,8 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
             let reader = tokio::spawn(client::telnet_recv(reader, encode_clone.clone()));
 
             // write
-            let writer = tokio::spawn(client::telnet_send(writer, encode_clone));
+            let v3 = Arc::clone(&v2);
+            let writer = tokio::spawn(client::telnet_send_from_buffer(&v3, writer, encode_clone));
 
             let _ = reader.await;
             writer.abort();
