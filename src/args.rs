@@ -11,7 +11,13 @@ pub enum IPv {
     IPv6,
 }
 
+pub enum Mode {
+    Client,
+    Server,
+}
+
 pub struct ArgStruct {
+    pub mode: Mode,
     pub url: String,
     pub port: u16,
     pub encode: Encode,
@@ -21,19 +27,27 @@ pub struct ArgStruct {
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    // destination URL (required)
+    /// set as server mode
+    #[arg(short, long)]
+    server: bool,
+
+    /// set as client mode (default)
+    #[arg(short, long)]
+    client: bool,
+
+    /// destination URL (required)
     #[arg(short, long)]
     url: String,
 
-    // destination port number (default: 23)
+    /// destination port number (default: 23)
     #[arg(short, long, default_value = "23")]
     port: u16,
 
-    // encode (utf8 or shift_jis; default: utf8)
+    /// encode (utf8 or shift_jis; default: utf8)
     #[arg(short, long, default_value = "utf8")]
     encode: String,
 
-    // IP version (4 or 6; default: 4)
+    /// IP version (4 or 6; default: 4)
     #[arg(short, long, default_value = "4")]
     ipv: u8,
 }
@@ -54,7 +68,14 @@ pub fn parser() -> ArgStruct {
         _ => IPv::IPv4,
     };
 
+    let mode = match (args.server, args.client) {
+        (true, false) => Mode::Server,
+        (false, true) => Mode::Client,
+        _ => Mode::Client,      // default
+    };
+
     ArgStruct {
+        mode: mode,
         url: args.url,
         port: args.port,
         encode: encode,
