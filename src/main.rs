@@ -1,6 +1,6 @@
 use std::net::ToSocketAddrs;
 use tokio::net::{TcpStream, TcpListener};
-use args::IPv;
+use args::{IPv, Encode};
 
 mod args;
 mod client;
@@ -54,16 +54,19 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
     let listener = TcpListener::bind(address.unwrap()).await?;
     loop {
         let (mut stream, _) = listener.accept().await?;
-        let (reader, writer) = tokio::io::split(stream);
+        let encode_clone = encode.clone();
+        tokio::spawn(async move {
+            let (reader, writer) = tokio::io::split(stream);
 
-        // read
-        let reader = tokio::spawn(client::telnet_recv(reader, encode.clone()));
+            // read
+            let reader = tokio::spawn(client::telnet_recv(reader, encode_clone.clone()));
 
-        // write
-        let writer = tokio::spawn(client::telnet_send(writer, encode.clone()));
+            // write
+            let writer = tokio::spawn(client::telnet_send(writer, encode_clone));
 
-        let _ = reader.await?;
-        writer.abort();
+            let _ = reader.await;
+            writer.abort();
+        });
     }
     
     Ok(())
