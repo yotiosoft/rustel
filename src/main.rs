@@ -42,7 +42,7 @@ async fn client(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
     }
 }
 
-async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Result<(), std::io::Error> {
+async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv, server_message: Option<String>) -> Result<(), std::io::Error> {
     let host_and_port = format!("{}:{}", host, port);
     let mut addresses = host_and_port.to_socket_addrs()?;
 
@@ -55,6 +55,7 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
     loop {
         let (mut stream, _) = listener.accept().await?;
         let encode_clone = encode.clone();
+        let server_message = server_message.clone();
         tokio::spawn(async move {
             let (reader, writer) = tokio::io::split(stream);
 
@@ -62,7 +63,12 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
             let reader = tokio::spawn(client::telnet_recv(reader, encode_clone.clone()));
 
             // write
-            let writer = tokio::spawn(client::telnet_send(writer, encode_clone));
+            let writer = if let Some(server_message) = server_message {
+                tokio::spawn(client::telnet_send_message(writer, encode_clone.clone(), server_message))
+            }
+            else {
+                tokio::spawn(client::telnet_send(writer, encode_clone.clone()))
+            };
 
             let _ = reader.await;
             writer.abort();
@@ -80,6 +86,7 @@ async fn main() -> tokio::io::Result<()> {
     let port = args.port;
     let encode = args.encode;
     let ipv = args.ipv;
+    let server_message = args.server_message;
     //let host = "koukoku.shadan.open.ad.jp";
     //let host = "india.colorado.edu";
     //let port = 23;
@@ -91,7 +98,7 @@ async fn main() -> tokio::io::Result<()> {
             client(host, port, encode, ipv).await?;
         },
         args::Mode::Server => {
-            server(host, port, encode, ipv).await?;
+            server(host, port, encode, ipv, server_message).await?;
         },
     }
 

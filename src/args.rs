@@ -22,6 +22,7 @@ pub struct ArgStruct {
     pub port: u16,
     pub encode: Encode,
     pub ipv: IPv,
+    pub server_message: Option<String>,
 }
 
 #[derive(clap::Parser, Debug)]
@@ -50,6 +51,10 @@ struct Args {
     /// IP version (4 or 6; default: 4)
     #[arg(short, long, default_value = "4")]
     ipv: u8,
+
+    /// message to send to client (server mode only)
+    #[arg(short, long)]
+    message: Option<String>,
 }
 
 pub fn parser() -> ArgStruct {
@@ -80,5 +85,6 @@ pub fn parser() -> ArgStruct {
         port: args.port,
         encode: encode,
         ipv: ipv,
+        server_message: args.message,
     }
 }

@@ -89,3 +89,11 @@ pub async fn telnet_send(mut stream: WriteHalf<TcpStream>, encode: Encode) -> Re
         }
     };
 }
+
+/// Get input from message-string and send it to server
+pub async fn telnet_send_message(mut stream: WriteHalf<TcpStream>, encode: Encode, message: String) -> Result<(), std::io::Error> {
+    match encode {
+        Encode::UTF8 => telnet_send_utf8(&mut stream, &message).await,
+        Encode::SHIFTJIS => telnet_send_sjis(&mut stream, &message).await,
+    }
+}
