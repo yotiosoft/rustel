@@ -91,7 +91,7 @@ pub async fn telnet_send(mut stream: WriteHalf<TcpStream>, encode: Encode) -> Re
 }
 
 /// Get input from buffer and send it to server
-pub async fn telnet_send_from_buffer<'a>(str_buffer: &'a String, mut stream: WriteHalf<TcpStream>, encode: Encode) -> Result<(), std::io::Error> {
+pub async fn telnet_send_from_buffer(str_buffer: &String, mut stream: WriteHalf<TcpStream>, encode: Encode) -> Result<(), std::io::Error> {
     loop {
         if str_buffer.len() > 0 {
             match encode {

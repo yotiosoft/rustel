@@ -1,7 +1,8 @@
 use std::net::ToSocketAddrs;
 use tokio::net::{TcpStream, TcpListener};
 use args::{IPv, Encode};
-use std::sync::Arc;
+use std::rc::Rc;
+use std::sync::Mutex;
 
 mod args;
 mod client;
@@ -54,20 +55,21 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
     };
 
     // write
-    let mut send_buffer = Arc::new(String::new());
+    let mut send_buffer = Rc::new(Mutex::new(String::new()));
     let encode_clone = encode.clone();
-    let v = Arc::clone(&send_buffer);
-    tokio::spawn(async move {
-        loop {
-            server::telnet_send(&v, encode_clone.clone()).await;
-        }
-    });
+    {
+        let send_buffer = Rc::clone(&send_buffer);
+        tokio::spawn(async move {
+            loop {
+                server::telnet_send(&send_buffer.lock().unwrap(), encode_clone.clone()).await;
+            }
+        });
+    }
 
     let listener = TcpListener::bind(address.unwrap()).await?;
     loop {
         let (mut stream, _) = listener.accept().await?;
         let encode_clone = encode.clone();
-        let v2 = Arc::clone(&send_buffer);
         tokio::spawn(async move {
             let (reader, writer) = tokio::io::split(stream);
 
@@ -75,8 +77,7 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
             let reader = tokio::spawn(client::telnet_recv(reader, encode_clone.clone()));
 
             // write
-            let v3 = Arc::clone(&v2);
-            let writer = tokio::spawn(client::telnet_send_from_buffer(&v3, writer, encode_clone));
+            let writer = tokio::spawn(client::telnet_send_from_buffer(&send_buffer.lock().unwrap(), writer, encode_clone));
 
             let _ = reader.await;
             writer.abort();
