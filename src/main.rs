@@ -2,7 +2,7 @@ use std::net::ToSocketAddrs;
 use tokio::net::{TcpStream, TcpListener};
 use args::{IPv, Encode};
 use std::rc::Rc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 mod args;
 mod client;
@@ -55,21 +55,25 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
     };
 
     // write
-    let mut send_buffer = Rc::new(Mutex::new(String::new()));
+    let send_buffer = Arc::new(Mutex::new(String::new()));
     let encode_clone = encode.clone();
     {
-        let send_buffer = Rc::clone(&send_buffer);
-        tokio::spawn(async move {
+        let send_buffer = Arc::clone(&send_buffer);
+        let updater = tokio::spawn({
             loop {
-                server::telnet_send(&send_buffer.lock().unwrap(), encode_clone.clone()).await;
+                if let Err(err) = server::telnet_send(&send_buffer.lock().unwrap(), encode_clone.clone()).await {
+                    eprintln!("Telnet send error: {}", err);
+                }
             }
         });
+        updater.await?;
     }
 
-    let listener = TcpListener::bind(address.unwrap()).await?;
+    let listener = TcpListener::bind(&address.unwrap()).await?;
     loop {
         let (mut stream, _) = listener.accept().await?;
         let encode_clone = encode.clone();
+        let send_buffer_clone = Arc::clone(&send_buffer);
         tokio::spawn(async move {
             let (reader, writer) = tokio::io::split(stream);
 
@@ -77,10 +81,14 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
             let reader = tokio::spawn(client::telnet_recv(reader, encode_clone.clone()));
 
             // write
-            let writer = tokio::spawn(client::telnet_send_from_buffer(&send_buffer.lock().unwrap(), writer, encode_clone));
+            let writer = tokio::spawn(client::telnet_send_from_buffer(&send_buffer_clone.lock().unwrap(), writer, encode_clone));
 
-            let _ = reader.await;
-            writer.abort();
+            if let Err(err) = reader.await {
+                eprintln!("Telnet receive error: {}", err);
+            }
+            if let Err(err) = writer.await {
+                eprintln!("Telnet write error: {}", err);
+            }
         });
     }
     
