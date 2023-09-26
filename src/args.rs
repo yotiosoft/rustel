@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::path::PathBuf;
 
 #[derive(Clone)]
 pub enum Encode {
@@ -25,6 +26,7 @@ pub struct ArgStruct {
     pub server_one_char: bool,
     pub server_wait_ms: u64,
     pub server_message: Option<String>,
+    pub server_message_file: Option<PathBuf>,
 }
 
 #[derive(clap::Parser, Debug)]
@@ -65,6 +67,10 @@ struct Args {
     /// message to send to client (server mode only)
     #[arg(short, long)]
     message: Option<String>,
+
+    /// message file to send to client (server mode only)
+    #[arg(short, long)]
+    file: Option<PathBuf>,
 }
 
 pub fn parser() -> ArgStruct {
@@ -98,5 +104,6 @@ pub fn parser() -> ArgStruct {
         server_one_char: args.one_char,
         server_wait_ms: args.wait_ms,
         server_message: args.message,
+        server_message_file: args.file,
     }
 }

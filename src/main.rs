@@ -1,6 +1,8 @@
 use std::net::ToSocketAddrs;
 use tokio::net::{TcpStream, TcpListener};
 use args::{IPv, Encode};
+use std::io::Read;
+use std::fs::File;
 
 mod args;
 mod client;
@@ -40,6 +42,17 @@ async fn client(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
         println!("No address found");
         Err(std::io::Error::new(std::io::ErrorKind::Other, "No address found"))
     }
+}
+
+fn read_file(path: &str) -> Result<String, std::io::Error> {
+    if !std::path::Path::new(path).exists() {
+        return Err(std::io::Error::new(std::io::ErrorKind::Other, "File not found"));
+    }
+
+    let mut file = File::open(path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
 }
 
 async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv, server_one_char: bool, server_message: Option<String>, wait_ms: u64) -> Result<(), std::io::Error> {
@@ -94,6 +107,7 @@ async fn main() -> tokio::io::Result<()> {
     let server_one_char = args.server_one_char;
     let server_wait_ms = args.server_wait_ms;
     let server_message = args.server_message;
+    let server_message_file = args.server_message_file;
     //let host = "koukoku.shadan.open.ad.jp";
     //let host = "india.colorado.edu";
     //let port = 23;
@@ -105,7 +119,13 @@ async fn main() -> tokio::io::Result<()> {
             client(host, port, encode, ipv).await?;
         },
         args::Mode::Server => {
-            server(host, port, encode, ipv, server_one_char, server_message, server_wait_ms).await?;
+            if let Some(server_message_file) = server_message_file {
+                let server_message = read_file(server_message_file.to_str().unwrap())?;
+                server(host, port, encode, ipv, server_one_char, Some(server_message), server_wait_ms).await?;
+            }
+            else {
+                server(host, port, encode, ipv, server_one_char, server_message, server_wait_ms).await?;
+            }
         },
     }
 
