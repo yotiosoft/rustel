@@ -22,6 +22,8 @@ pub struct ArgStruct {
     pub port: u16,
     pub encode: Encode,
     pub ipv: IPv,
+    pub server_one_char: bool,
+    pub server_wait_ms: u64,
     pub server_message: Option<String>,
 }
 
@@ -51,6 +53,14 @@ struct Args {
     /// IP version (4 or 6; default: 4)
     #[arg(short, long, default_value = "4")]
     ipv: u8,
+
+    /// send one character to client (server mode only)
+    #[arg(short, long)]
+    one_char: bool,
+
+    /// wait time for sending the message (millisecond) (server mode only; default: 100)
+    #[arg(short, long, default_value = "100")]
+    wait_ms: u64,
 
     /// message to send to client (server mode only)
     #[arg(short, long)]
@@ -85,6 +95,8 @@ pub fn parser() -> ArgStruct {
         port: args.port,
         encode: encode,
         ipv: ipv,
+        server_one_char: args.one_char,
+        server_wait_ms: args.wait_ms,
         server_message: args.message,
     }
 }

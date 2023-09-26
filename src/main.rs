@@ -42,7 +42,7 @@ async fn client(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
     }
 }
 
-async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv, server_message: Option<String>) -> Result<(), std::io::Error> {
+async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv, server_one_char: bool, server_message: Option<String>, wait_ms: u64) -> Result<(), std::io::Error> {
     let host_and_port = format!("{}:{}", host, port);
     let mut addresses = host_and_port.to_socket_addrs()?;
 
@@ -64,7 +64,12 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv, server_
 
             // write
             let writer = if let Some(server_message) = server_message {
-                tokio::spawn(client::telnet_send_message(writer, encode_clone.clone(), server_message))
+                if server_one_char {
+                    tokio::spawn(client::telnet_send_message_per_one_char(writer, encode_clone.clone(), server_message, wait_ms))
+                }
+                else {
+                    tokio::spawn(client::telnet_send_message(writer, encode_clone.clone(), server_message))
+                }
             }
             else {
                 tokio::spawn(client::telnet_send(writer, encode_clone.clone()))
@@ -86,6 +91,8 @@ async fn main() -> tokio::io::Result<()> {
     let port = args.port;
     let encode = args.encode;
     let ipv = args.ipv;
+    let server_one_char = args.server_one_char;
+    let server_wait_ms = args.server_wait_ms;
     let server_message = args.server_message;
     //let host = "koukoku.shadan.open.ad.jp";
     //let host = "india.colorado.edu";
@@ -98,7 +105,7 @@ async fn main() -> tokio::io::Result<()> {
             client(host, port, encode, ipv).await?;
         },
         args::Mode::Server => {
-            server(host, port, encode, ipv, server_message).await?;
+            server(host, port, encode, ipv, server_one_char, server_message, server_wait_ms).await?;
         },
     }
 

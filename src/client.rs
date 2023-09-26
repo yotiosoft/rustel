@@ -97,3 +97,16 @@ pub async fn telnet_send_message(mut stream: WriteHalf<TcpStream>, encode: Encod
         Encode::SHIFTJIS => telnet_send_sjis(&mut stream, &message).await,
     }
 }
+
+/// Get input from message-string and send it to server (one character per one time)
+pub async fn telnet_send_message_per_one_char(mut stream: WriteHalf<TcpStream>, encode: Encode, message: String, t: u64) -> Result<(), std::io::Error> {
+    for c in message.chars() {
+        match encode {
+            Encode::UTF8 => telnet_send_utf8(&mut stream, &c.to_string()).await,
+            Encode::SHIFTJIS => telnet_send_sjis(&mut stream, &c.to_string()).await,
+        }?;
+        // wait t millisecond
+        tokio::time::sleep(std::time::Duration::from_millis(t)).await;
+    }
+    Ok(())
+}
