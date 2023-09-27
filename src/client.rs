@@ -8,6 +8,9 @@ use super::args::Encode;
 async fn telnet_recv_utf8(stream: &mut ReadHalf<TcpStream>) -> Result<Option<String>, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
     let buffer = buf_reader.fill_buf().await?;
+    if buffer.len() == 0 {
+        return Err(std::io::Error::new(std::io::ErrorKind::Other, "No data reverived. Maybe connection closed."));
+    }
     //println!("Received message: {}", buffer);
     if buffer.len() == 0 {
         return Ok(None);
@@ -19,6 +22,9 @@ async fn telnet_recv_utf8(stream: &mut ReadHalf<TcpStream>) -> Result<Option<Str
 async fn telnet_recv_sjis(stream: &mut ReadHalf<TcpStream>) -> Result<Option<String>, std::io::Error> {
     let mut buf_reader = BufReader::new(stream);
     let buffer = buf_reader.fill_buf().await?;
+    if buffer.len() == 0 {
+        return Err(std::io::Error::new(std::io::ErrorKind::Other, "No data reverived. Maybe connection closed."));
+    }
     if buffer[0] == 0 {
         return Ok(None);
     }

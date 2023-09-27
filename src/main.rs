@@ -31,6 +31,7 @@ async fn client(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
 
                 let _ = reader.await?;
                 writer.abort();
+                println!("Connection closed.");
                 Ok(())
             },
             Err(e) => {
@@ -70,6 +71,8 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv, server_
         let encode_clone = encode.clone();
         let server_message = server_message.clone();
         tokio::spawn(async move {
+            let addr = stream.peer_addr().unwrap();
+            println!("Accepted connection from: {}", addr);
             let (reader, writer) = tokio::io::split(stream);
 
             // read
@@ -90,6 +93,7 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv, server_
 
             let _ = reader.await;
             writer.abort();
+            println!("Connection with {} closed.", addr);
         });
     }
     
