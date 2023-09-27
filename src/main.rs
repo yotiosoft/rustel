@@ -21,6 +21,7 @@ async fn client(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
         match TcpStream::connect(address).await {
             Ok(stream) => {
                 println!("Connected to the server!");
+                let address = stream.peer_addr()?;
                 let (reader, writer) = tokio::io::split(stream);
 
                 // read
@@ -31,7 +32,7 @@ async fn client(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
 
                 let _ = reader.await?;
                 writer.abort();
-                println!("Connection closed.");
+                println!("\nConnection with {address} closed.");
                 Ok(())
             },
             Err(e) => {

@@ -70,7 +70,6 @@ async fn telnet_send_utf8(stream: &mut WriteHalf<TcpStream>, str: &str) -> Resul
 
 /// Get input from stdin and send it to server as Shift-JIS
 async fn telnet_send_sjis(stream: &mut WriteHalf<TcpStream>, str: &str) -> Result<(), std::io::Error> {
-    println!("send: {}", str);
     let buf_writer = stream;
     let (cow, _, _) = encoding_rs::SHIFT_JIS.encode(str);
     buf_writer.write(&cow).await?;
