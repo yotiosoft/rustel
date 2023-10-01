@@ -1,11 +1,11 @@
 use std::net::ToSocketAddrs;
 use tokio::net::{TcpStream, TcpListener};
-use args::{IPv, Encode};
+use args::IPv;
 use std::io::Read;
 use std::fs::File;
 
 mod args;
-mod client;
+mod telnet;
 
 async fn client(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Result<(), std::io::Error> {
     let host_and_port = format!("{}:{}", host, port);
@@ -25,10 +25,10 @@ async fn client(host: String, port: u16, encode: args::Encode, ipv: IPv) -> Resu
                 let (reader, writer) = tokio::io::split(stream);
 
                 // read
-                let reader = tokio::spawn(client::telnet_recv(reader, encode.clone()));
+                let reader = tokio::spawn(telnet::telnet_recv(reader, encode.clone()));
 
                 // write
-                let writer = tokio::spawn(client::telnet_send(writer, encode.clone()));
+                let writer = tokio::spawn(telnet::telnet_send(writer, encode.clone()));
 
                 let _ = reader.await?;
                 writer.abort();
@@ -77,19 +77,19 @@ async fn server(host: String, port: u16, encode: args::Encode, ipv: IPv, server_
             let (reader, writer) = tokio::io::split(stream);
 
             // read
-            let reader = tokio::spawn(client::telnet_recv(reader, encode_clone.clone()));
+            let reader = tokio::spawn(telnet::telnet_recv(reader, encode_clone.clone()));
 
             // write
             let writer = if let Some(server_message) = server_message {
                 if server_one_char {
-                    tokio::spawn(client::telnet_send_message_per_one_char(writer, encode_clone.clone(), server_message, wait_ms))
+                    tokio::spawn(telnet::telnet_send_message_per_one_char(writer, encode_clone.clone(), server_message, wait_ms))
                 }
                 else {
-                    tokio::spawn(client::telnet_send_message(writer, encode_clone.clone(), server_message))
+                    tokio::spawn(telnet::telnet_send_message(writer, encode_clone.clone(), server_message))
                 }
             }
             else {
-                tokio::spawn(client::telnet_send(writer, encode_clone.clone()))
+                tokio::spawn(telnet::telnet_send(writer, encode_clone.clone()))
             };
 
             let _ = reader.await;
